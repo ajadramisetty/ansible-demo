@@ -1,0 +1,28 @@
+- name: Auto-heal disk space
+  hosts: all
+  become: yes
+
+  tasks:
+
+    - name: Show disk usage BEFORE
+      command: df -h /var
+      register: before
+
+    - debug:
+        var: before.stdout_lines
+
+    - name: Clean old logs (>2 days)
+      shell: |
+        find /var/log -type f -name "*.log" -mtime +2 -exec rm -f {} \;
+      ignore_errors: yes
+
+    - name: Clean temp files
+      shell: rm -rf /tmp/*
+      ignore_errors: yes
+
+    - name: Show disk usage AFTER
+      command: df -h /var
+      register: after
+
+    - debug:
+        var: after.stdout_lines
