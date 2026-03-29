@@ -2,27 +2,37 @@
   hosts: all
   become: yes
 
+  vars:
+    cleanup_path: "{{ cleanup_path | default('/var') }}"
+
   tasks:
 
     - name: Show disk usage BEFORE
-      command: df -h /var
+      command: df -h {{ cleanup_path }}
       register: before
 
-    - debug:
+    - name: Print BEFORE usage
+      debug:
         var: before.stdout_lines
 
     - name: Clean old logs (>2 days)
       shell: |
-        find /var/log -type f -name "*.log" -mtime +2 -exec rm -f {} \;
+        find {{ cleanup_path }}/log -type f -name "*.log" -mtime +2 -delete
       ignore_errors: yes
 
-    - name: Clean temp files
-      shell: rm -rf /tmp/*
+    - name: Clean temp files safely (avoid AWX internal dirs)
+      shell: |
+        find /tmp -type f -mtime +1 -not -path "/tmp/bwrap_*" -delete
       ignore_errors: yes
 
     - name: Show disk usage AFTER
-      command: df -h /var
+      command: df -h {{ cleanup_path }}
       register: after
 
-    - debug:
+    - name: Print AFTER usage
+      debug:
         var: after.stdout_lines
+
+    - name: Mark completion
+      debug:
+        msg: "Cleanup triggered by {{ triggered_by | default('manual') }} for problem {{ problem_id | default('N/A') }}"
