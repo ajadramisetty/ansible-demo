@@ -1,0 +1,45 @@
+---
+- name: NGINX Self-Healing POC
+  hosts: all
+  become: yes
+  tasks:
+    - name: Ensure NGINX is installed
+      package:
+        name: nginx
+        state: present
+
+    - name: Create systemd override directory for NGINX
+      file:
+        path: /etc/systemd/system/nginx.service.d
+        state: directory
+        mode: '0755'
+
+    - name: Apply Self-Healing (Auto-Restart) configuration
+      copy:
+        dest: /etc/systemd/system/nginx.service.d/override.conf
+        content: |
+          [Service]
+          # Restart the service regardless of exit code or signal
+          Restart=always
+          # Wait 5 seconds before restarting to prevent thrashing
+          RestartSec=5s
+          # Allow 5 restarts within 600 seconds before stopping attempts
+          StartLimitIntervalSec=600
+          StartLimitBurst=5
+        mode: '0644'
+
+    - name: Reload systemd to pick up changes
+      systemd:
+        daemon_reload: yes
+
+    - name: Ensure NGINX is started and enabled
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Verify NGINX is listening on expected port
+      wait_for:
+        port: 80
+        timeout: 10
+
