@@ -3,8 +3,12 @@
   hosts: all
   become: yes
   tasks:
+    - name: Remove conflicting CentOS repo files (Ubuntu fix)
+      shell: "rm -rf /etc/yum.repos.d/"
+      ignore_errors: yes
+
     - name: Ensure NGINX is installed
-      package:
+      apt:
         name: nginx
         state: present
         update_cache: yes
