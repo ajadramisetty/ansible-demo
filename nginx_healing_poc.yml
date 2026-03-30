@@ -8,38 +8,56 @@
         name: nginx
         state: present
 
-    - name: Create systemd override directory for NGINX
+    - name: Configure NGINX to listen on Port 8080
+      lineinfile:
+        path: /etc/nginx/sites-enabled/default
+        regexp: 'listen 80 default_server;'
+        line: 'listen 8080 default_server;'
+      notify: Restart NGINX
+
+    - name: Also update IPv6 listen port
+      lineinfile:
+        path: /etc/nginx/sites-enabled/default
+        regexp: 'listen \[::\]:80 default_server;'
+        line: 'listen [::]:8080 default_server;'
+      notify: Restart NGINX
+
+    - name: Create systemd override directory
       file:
         path: /etc/systemd/system/nginx.service.d
         state: directory
         mode: '0755'
 
-    - name: Apply Self-Healing (Auto-Restart) configuration
+    - name: Apply Systemd Auto-Restart configuration
       copy:
         dest: /etc/systemd/system/nginx.service.d/override.conf
         content: |
           [Service]
-          # Restart the service regardless of exit code or signal
           Restart=always
-          # Wait 5 seconds before restarting to prevent thrashing
           RestartSec=5s
-          # Allow 5 restarts within 600 seconds before stopping attempts
           StartLimitIntervalSec=600
           StartLimitBurst=5
         mode: '0644'
+      notify: Reload Systemd
 
-    - name: Reload systemd to pick up changes
-      systemd:
-        daemon_reload: yes
-
-    - name: Ensure NGINX is started and enabled
+    - name: Ensure NGINX is enabled and running
       systemd:
         name: nginx
         state: started
         enabled: yes
 
-    - name: Verify NGINX is listening on expected port
+    - name: Verify NGINX is healing on port 8080
       wait_for:
-        port: 80
-        timeout: 10
+        port: 8080
+        timeout: 15
+
+  handlers:
+    - name: Reload Systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Restart NGINX
+      systemd:
+        name: nginx
+        state: restarted
 
