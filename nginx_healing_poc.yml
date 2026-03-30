@@ -1,69 +1,20 @@
 ---
-- name: NGINX Self-Healing POC
+- name: NGINX Self-Healing POC (RAW)
   hosts: all
   become: yes
-  gather_facts: no 
+  gather_facts: no
   tasks:
-    - name: Remove conflicting CentOS repo files (Ubuntu fix)
-      shell: "rm -rf /etc/yum.repos.d/"
-      ignore_errors: yes
-
-    - name: Ensure NGINX is installed
-      apt:
-        name: nginx
-        state: present
-        update_cache: yes
-
-    - name: Configure NGINX to listen on Port 8080
-      lineinfile:
-        path: /etc/nginx/sites-enabled/default
-        regexp: 'listen 80 default_server;'
-        line: 'listen 8080 default_server;'
-      notify: Restart NGINX
-
-    - name: Also update IPv6 listen port
-      lineinfile:
-        path: /etc/nginx/sites-enabled/default
-        regexp: 'listen \[::\]:80 default_server;'
-        line: 'listen [::]:8080 default_server;'
-      notify: Restart NGINX
-
-    - name: Create systemd override directory
-      file:
-        path: /etc/systemd/system/nginx.service.d
-        state: directory
-        mode: '0755'
-
-    - name: Apply Systemd Auto-Restart configuration
-      copy:
-        dest: /etc/systemd/system/nginx.service.d/override.conf
-        content: |
-          [Service]
-          Restart=always
-          RestartSec=5s
-          StartLimitIntervalSec=600
-          StartLimitBurst=5
-        mode: '0644'
-      notify: Reload Systemd
-
-    - name: Ensure NGINX is enabled and running
-      systemd:
-        name: nginx
-        state: started
-        enabled: yes
-
-    - name: Verify NGINX is healing on port 8080
-      wait_for:
-        port: 8080
-        timeout: 15
-
-  handlers:
-    - name: Reload Systemd
-      systemd:
-        daemon_reload: yes
-
-    - name: Restart NGINX
-      systemd:
-        name: nginx
-        state: restarted
+    - name: Apply Self-Healing and Port 8080 Config
+      raw: |
+        # Update Port to 8080
+        sed -i 's/listen 80 default_server;/listen 8080 default_server;/g' /etc/nginx/sites-enabled/default
+        sed -i 's/listen \[::\]:80 default_server;/listen [::]:8080 default_server;/g' /etc/nginx/sites-enabled/default
+        
+        # Create Systemd Healing Override
+        mkdir -p /etc/systemd/system/nginx.service.d
+        echo -e "[Service]\nRestart=always\nRestartSec=5s" > /etc/systemd/system/nginx.service.d/override.conf
+        
+        # Reload and Restart
+        systemctl daemon-reload
+        systemctl restart nginx
 
