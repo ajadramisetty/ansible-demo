@@ -2,6 +2,7 @@
 - name: NGINX Self-Healing POC
   hosts: all
   become: yes
+  gather_facts: no 
   tasks:
     - name: Remove conflicting CentOS repo files (Ubuntu fix)
       shell: "rm -rf /etc/yum.repos.d/"
